@@ -32,11 +32,11 @@ def get_datamodel ():
 	datamodel['authorMetadata'] = {
 		'authorGivenName': './/given-names',
 		'authorMainName': './/surname',
-		'affiliationRef': './/xref[@ref-type="aff"]'
+		'affiliationRef': ".//xref[@ref-type='aff']"
 	}
 	
 	datamodel['affiliationWrapper'] = './/aff'
-	datamodel['affiliationIdentifier'] = './/label'
+	datamodel['affiliationIdentifier'] = 'id'
 	datamodel['affiliation'] = {
 		'institution': './/institution',
 		'address': './/addr-line'

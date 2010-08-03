@@ -134,48 +134,45 @@ def read_xml (inputFile, authorities):
 	
 	# START affiliations bit needed for NLM xml. It's kindof awkward, but I can't think of any more elegant way of doing it.
 	affiliationData = {}
-	#affiliations = get_elementContent(artWrapper, datamodel['affiliationWrapper'], inputFile)
 	affiliations = artWrapper.findall(datamodel['affiliationWrapper'])
 	affiliations = list(result for result in affiliations) #turn it into a list
 	
-	if len(affiliations) >= 1: #As long as the affiliations aren't empty...
-	
-		#If the affiliations are listed with identifiers, then there will be multiple affiliations. Analyse them separately, so that authors can be linked to them separately
-		if affiliations[0].find(datamodel['affiliationIdentifier']) != None:
-			for aff in affiliations:
-				#affiliationId = get_elementContent(aff, datamodel['affiliationIdentifier'], inputFile)
-				affiliationId = aff.find(datamodel['affiliationIdentifier'])
-				affiliationId = value_cleanup(get_text(affiliationId)) #get string
-				affiliationData[affiliationId] = {}
-				for elementName in datamodel['affiliation'].keys():
-					#data = get_elementContent(aff, datamodel['affiliation'][elementName], inputFile)
-					data = aff.find(datamodel['affiliation'][elementName])
-					if data != None:
-						data = value_cleanup(get_text(data))
-						affiliationData[affiliationId][elementName] = data
-				#Sometimes the affiliation data is unstructured, so:
-				if affiliationData[affiliationId].keys()==None:
-					affiliationData[affiliationId]['dc:Description'] = get_text(aff)
-				affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
-		# Otherwise, just describe one affiliation (and give it a 'dummyRef'
-		else:
-			aff = 0
-			if len(affiliations) > 1:
-				print "Multiple affiliations, but no xrefs to attach authors to affiliations"
-			
-			aff = affiliations[0]
+	#If there are multiple affiliations, then analyse them separately so that authors can be linked to them separately
+	if len(affiliations) > 1:
+		for aff in affiliations:
+			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
+			affiliationId = value_cleanup(affiliationId)
+			#print "AffId: " + affiliationId
+			if affiliationId == None:
+				print "Multiple affiliations, but at least one of the affiliations lacks an ID that allows it to be associated with particular authors"
+				continue
 				
-			affiliationId = 'dummyRef'
 			affiliationData[affiliationId] = {}
 			for elementName in datamodel['affiliation'].keys():
-				data = aff.find(datamodel['affiliation'][elementName])
-				if data != None:
-					data = value_cleanup(get_text(data))
+				data = aff.findall(datamodel['affiliation'][elementName])
+				data = list(get_text(result) for result in data) # listify
+				if data != []:
+					data = value_cleanup(data)
 					affiliationData[affiliationId][elementName] = data
 			#Sometimes the affiliation data is unstructured, so:
-			if len(affiliationData[affiliationId].keys()) == 0:
-				affiliationData[affiliationId]['description'] = get_text(aff)
+			if affiliationData[affiliationId].keys()==None:
+				affiliationData[affiliationId]['dc:Description'] = get_text(aff)
 			affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
+	
+	# Otherwise, just describe one affiliation (and give it a 'dummyRef'
+	elif len(affiliations) == 1:
+		aff = affiliations[0]
+		affiliationId = 'dummyRef'
+		affiliationData[affiliationId] = {}
+		for elementName in datamodel['affiliation'].keys():
+			data = aff.find(datamodel['affiliation'][elementName])
+			if data != None:
+				data = value_cleanup(get_text(data))
+				affiliationData[affiliationId][elementName] = data
+		#Sometimes the affiliation data is unstructured, so:
+		if len(affiliationData[affiliationId].keys()) == 0:
+			affiliationData[affiliationId]['description'] = get_text(aff)
+		affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
 	# END affiliation bit 
 	
 	
@@ -191,18 +188,25 @@ def read_xml (inputFile, authorities):
 				#Collect the author metadata, and use it to see whether this author is new, or already known
 				authorData = {}
 				for metaField in datamodel['authorMetadata'].keys():
-					data = eachAuthor.findall(datamodel['authorMetadata'][metaField])
-					data = list(get_text(result) for result in data) #turn it into a list
+					data = 0
+					if metaField != 'affiliationRef':
+						data = eachAuthor.findall(datamodel['authorMetadata'][metaField])
+						data = list(get_text(result) for result in data) #turn it into a list
+					elif metaField == 'affiliationRef':
+						element = eachAuthor.find(datamodel['authorMetadata'][metaField])
+						if element == None:
+							continue
+						data = element.attrib.get('rid') #Need to do this extra step - only way ElementTree allows you to get an attribute from a descendant element (not directly supported in their "find" xpath function
 					data = value_cleanup(data)
 					
-					if data != []:
+					if data != [] and data != None:
 						authorData[metaField] = data
 				
 				#If the author has a ref to one of multiple affiliations listed
 				if authorData.has_key('affiliationRef'):
 					# Replace the affiliationRef field with an affiliation field
 					affiliationRef = authorData['affiliationRef']
-					affiliationRef = affiliationRef[0]
+					#print "AffiliationRef: " + affiliationRef
 					affiliation = affiliationData[affiliationRef]
 					authorData['affiliation'] = affiliation
 					del authorData['affiliationRef']
