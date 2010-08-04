@@ -87,7 +87,6 @@ for inputFileName in sorted(sourceFiles):
 		pos = 0 #position as we cycle through the list of keys
 		for predicate in sorted(triples[subject].keys()):
 			values = triples[subject][predicate]
-			
 			# # # Here we are going to make sure the output value is a string
 			if type(values).__name__=='dict':
 				valueList = []
