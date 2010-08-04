@@ -14,10 +14,11 @@ def get_vocabulary (input):
 		'institution': 'foaf:name',
 		'address': 'v:adr',
 		
-		'artJournal': 'bibtex:hasJournal',  #what to use here?
+		'artJournal': 'bibtex:hasJournal',  # what to use here?
 		'artVolume': 'prism:volume', 
 		'artTitle': 'dc:title',
-		'artYear': 'fabio:hasPublicationYear',
+		'artPubYear': '__printPublicationYear', # Will later need to be restructured as frbr:embodiment	[[rdf:type	print-object; fabio:hasPublicationYear	"YYYY"], [rdf:type	digital-information-object; fabio:hasPublicationYear	"YYYY"]]
+		'artEpubYear': '__ePublicationYear', # As with previous
 		'artFirstPage': 'prism:startingPage', 
 		'artLastPage': 'prism:endingPage',
 		'refJournal': 'bibtex:hasJournal', 

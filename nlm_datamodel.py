@@ -2,6 +2,7 @@ def get_datamodel ():
 	#This maps the information we need onto the NLM xml elements
 	datamodel = {}
 	datamodel['artWrapperElement'] = './/front'
+	datamodel['fulltextElement'] = './/body'
 	datamodel['artIdentifierElement'] = './/article-id[@pub-id-type="pmc"]'
 	datamodel['artIdentifierBase'] = 'ukpmc.ac.uk/pmid/'
 	datamodel['artMetadata'] = {
@@ -11,7 +12,8 @@ def get_datamodel ():
 		'artVolume': './/volume',
 		'artFirstPage': './/fpage',
 		'artLastPage': './/lpage',
-		'artYear': './/year'
+		'artPubYear': './/pub-date[@pub-type="ppub"]/year',
+		'artEpubYear': './/pub-date[@pub-type="epub"]/year'
 	}
 	
 	datamodel['refElement'] = './/ref' #The wrapper for a single citation in the references list
