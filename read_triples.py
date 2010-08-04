@@ -83,10 +83,79 @@ def get_text (xmlElement):
 	textString = ElementTree.tostring(xmlElement) #Get the whole element as a string
 	textString = re.sub('<[^>]+>', '', textString) #Remove tags
 	return textString
+	
+
+# For extracting author affiliations; decided to make this a separate function (compared to other content extraction) because it's rather complicated
+def get_affiliations (artWrapper, datamodel):
+	affiliationData = {}
+	affiliations = artWrapper.findall(datamodel['affiliationWrapper'])
+	affiliations = list(result for result in affiliations) #turn it into a list
+	
+	#If there are multiple affiliations, then analyse them separately so that authors can be linked to them separately
+	if len(affiliations) > 1:
+		for aff in affiliations:
+			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
+			if affiliationId == None:
+				print "Multiple affiliations, but at least one of the affiliations lacks an ID that allows it to be associated with particular authors"
+				continue
+			affiliationId = value_cleanup(affiliationId)
+			
+			affiliationData[affiliationId] = {}
+			for elementName in datamodel['affiliation'].keys():
+				data = aff.findall(datamodel['affiliation'][elementName])
+				data = list(get_text(result) for result in data) # listify
+				if data != []:
+					data = value_cleanup(data)
+					affiliationData[affiliationId][elementName] = data
+			#Sometimes the affiliation data is unstructured, so:
+			if affiliationData[affiliationId].keys() == []:
+				
+				#Need to remove label and sup elements
+				textString = ElementTree.tostring(aff)
+				textString = re.sub('<label( [^>]+)?>.+?</label>', '', textString)
+				textString = re.sub('<sup( [^>]+)?>.+?</sup>', '', textString)
+				aff = ElementTree.fromstring(textString)
+				
+				affiliationData[affiliationId]['description'] = get_text(aff)
+			affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
+			#print affiliationData[affiliationId]
+	
+	# Otherwise, just describe one affiliation (and give it a 'dummyRef'
+	elif len(affiliations) == 1:
+		aff = affiliations[0]
+		# Sometimes there will still be an identifier, even on a single affiliation
+		affiliationId = 0
+		if aff.attrib.get(datamodel['affiliationIdentifier']):
+			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
+			affiliationId = value_cleanup(affiliationId)
+		else: #otherwise use this pseudo-identifier
+			affiliationId = 'dummyRef'
+			
+		affiliationData[affiliationId] = {}
+		for elementName in datamodel['affiliation'].keys():
+			data = aff.find(datamodel['affiliation'][elementName])
+			if data != None:
+				data = value_cleanup(get_text(data))
+				affiliationData[affiliationId][elementName] = data
+		
+		#Sometimes the affiliation data is unstructured, so:
+		if affiliationData[affiliationId].keys() == []:
+			
+			#Need to remove label and sup elements
+			textString = ElementTree.tostring(aff)
+			textString = re.sub('<label( [^>]+)?>.+?</label>', '', textString)
+			textString = re.sub('<sup( [^>]+)?>.+?</sup>', '', textString)
+			aff = ElementTree.fromstring(textString)
+				
+			affiliationData[affiliationId]['description'] = get_text(aff)
+		
+		affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
+	
+	return affiliationData
+	# END
 
 # Method for reading in from xml format
 def read_xml (inputFile, authorities):
-	
 	triples = {}
 	
 	# Read the input as a single string
@@ -106,75 +175,19 @@ def read_xml (inputFile, authorities):
 	
 	xmlRoot = ElementTree.fromstring(inputString) 
 	
-	#print xmlRoot
-	""" START ElementTree TESTING
-	ids = xmlRoot.findall('.//article-id[@pub-id-type="pmid"]')
-	for id in ids:
-		tag = id.tag
-		text = id.text
-		attribute = id.get('pub-id-type')
-		element = ElementTree.tostring(id)
-		
-		print "TAG: " + tag
-		print "TEXT: " + text
-		print "ATT: " + attribute
-		print "ELEMENT: " + element
-	END ElementTree TESTING """
-	
 	datamodel = get_datamodel() # Imports the (NLM) datamodel as a multidimensional dictionary object
 	
-	#Get the block of article information, using the datamodel to navigate the xml
+	#Get the block of article metadata info, using the datamodel to navigate the xml
 	artWrapper = xmlRoot.find(datamodel['artWrapperElement'])
 	
 	#From the artWrapper, get the unique article identifier
 	artIdentifier = artWrapper.find(datamodel['artIdentifierElement'])
 	artIdentifier = "<"+str(datamodel['artIdentifierBase'])+get_text(artIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
 	
-	triples[artIdentifier] = {} # Create a dictionary entry for the article
+	triples[artIdentifier] = {} # Create a dictionary object for the article
 	
-	# START affiliations bit needed for NLM xml. It's kindof awkward, but I can't think of any more elegant way of doing it.
-	affiliationData = {}
-	affiliations = artWrapper.findall(datamodel['affiliationWrapper'])
-	affiliations = list(result for result in affiliations) #turn it into a list
-	
-	#If there are multiple affiliations, then analyse them separately so that authors can be linked to them separately
-	if len(affiliations) > 1:
-		for aff in affiliations:
-			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
-			affiliationId = value_cleanup(affiliationId)
-			#print "AffId: " + affiliationId
-			if affiliationId == None:
-				print "Multiple affiliations, but at least one of the affiliations lacks an ID that allows it to be associated with particular authors"
-				continue
-				
-			affiliationData[affiliationId] = {}
-			for elementName in datamodel['affiliation'].keys():
-				data = aff.findall(datamodel['affiliation'][elementName])
-				data = list(get_text(result) for result in data) # listify
-				if data != []:
-					data = value_cleanup(data)
-					affiliationData[affiliationId][elementName] = data
-			#Sometimes the affiliation data is unstructured, so:
-			if affiliationData[affiliationId].keys()==None:
-				affiliationData[affiliationId]['dc:Description'] = get_text(aff)
-			affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
-	
-	# Otherwise, just describe one affiliation (and give it a 'dummyRef'
-	elif len(affiliations) == 1:
-		aff = affiliations[0]
-		affiliationId = 'dummyRef'
-		affiliationData[affiliationId] = {}
-		for elementName in datamodel['affiliation'].keys():
-			data = aff.find(datamodel['affiliation'][elementName])
-			if data != None:
-				data = value_cleanup(get_text(data))
-				affiliationData[affiliationId][elementName] = data
-		#Sometimes the affiliation data is unstructured, so:
-		if len(affiliationData[affiliationId].keys()) == 0:
-			affiliationData[affiliationId]['description'] = get_text(aff)
-		affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
-	# END affiliation bit 
-	
+	# Before going on to collect other article metadata, collect the author affiliations data, which will be used in building graphs for the article authors
+	affiliationData = get_affiliations(artWrapper, datamodel)
 	
 	#And now get each of the article metadata fields from the artWrapper; when you get to authors, given them their own graphs
 	for elementName in datamodel['artMetadata'].keys():
@@ -202,11 +215,10 @@ def read_xml (inputFile, authorities):
 					if data != [] and data != None:
 						authorData[metaField] = data
 				
-				#If the author has a ref to one of multiple affiliations listed
+				#If the author has a ref to one of multiple affiliations listed, record that as their affiliation
 				if authorData.has_key('affiliationRef'):
 					# Replace the affiliationRef field with an affiliation field
 					affiliationRef = authorData['affiliationRef']
-					#print "AffiliationRef: " + affiliationRef
 					affiliation = affiliationData[affiliationRef]
 					authorData['affiliation'] = affiliation
 					del authorData['affiliationRef']
@@ -250,7 +262,6 @@ def read_xml (inputFile, authorities):
 			refIdentifier = md5() #Create an md5 hash object
 			refIdentifier.update(get_text(ref))
 			refIdentifier = "<"+str(refIdentifier.hexdigest())+">"
-			#print "REFID: " + refIdentifier
 		else:
 			refIdentifier = "<"+str(datamodel['refIdentifierBase'])+get_text(refIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
 
