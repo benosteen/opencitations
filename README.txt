@@ -23,7 +23,7 @@ It can accept triples (as dumped from a triplestore), or xml documents (as recei
 
 The scripts attempt to be as flexible and configurable as possible, with regard to the xml datamodel of source input, and the required RDF vocabulary for the output.
 
-At present output is only in Turtle format, however the production of output data is a fairly discrete function (see convert-to-turtle.py), with the intention that other output options could be easily added. All data is gathered from an input file in one phase, then all data is output in a second (much simpler) phase. If other output options were added, perhaps the program might change its name, as "turtle" would not longer be the sole aim.
+At present output is only in Turtle format, however the production of output data is a discrete function (see "output_turtle" in convert-to-turtle.py), with the intention that other output options could be easily added. All data is gathered from an input file in one phase, then all data is output in a second (much simpler) phase. If other output options were added, perhaps the program might change its name, as "turtle" would not longer be the sole aim.
 
 Whatever the input format, the scripts aim to read the input in to a multi-dimensional dictionary object named "triples". It has these dimensions:
 triples[subject][predicate][value]
@@ -59,7 +59,9 @@ The triples dictionary effectively stores named graphs for each of the following
 
 As each graph is created in the dictionary, it also makes sure that there is always an rdf:type triple.
 
-It stores all the triples it can find in a single input file, then outputs them to an output file.
+It stores all the triples it can find in a single input file, then outputs them to an output file. The scripts cycle through all files in the given directory, and write output to a parallel directory, which is given the same name as the input directory, with "_Turtle-RDF" appended.
+
+Also output is a single report log, which lists all files transformed, and for each whether it was able to find: -article metadata; -article fulltext; -references list.
 
 A subject must always be a unique string; predicates are also strings. Values can be either strings, lists of values, or even dictionaries containing a series of value pairs. At present, there are only dictionary objects at the value level in the case of authors' institutional affiliations. e.g.:
 
