@@ -8,8 +8,8 @@ def get_vocabulary (input):
 		# These are the controlled vocabulary terms for the "element names" used for reading from xml sources
 		'artAuthor': 'terms:creator',
 		'refAuthor': 'terms:creator',
-		'authorGivenName': 'foaf:familyName',
-		'authorMainName': 'foaf:firstName',
+		'authorGivenName': 'foaf:firstName',
+		'authorMainName': 'foaf:familyName',
 		'affiliation': 'foaf:member',
 		'institution': 'foaf:name',
 		'address': 'v:adr',
