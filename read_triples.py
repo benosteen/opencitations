@@ -6,7 +6,7 @@ import re
 import sys
 from rdf_string_cleanup import predicate_cleanup
 from rdf_string_cleanup import value_cleanup
-from nlm_datamodel import get_datamodel
+from nlm_datamodel import get_datamodel, get_namespaces
 from hashlib import md5
 from check_knownAuthors import check_knownAuthors
 from elementtree import ElementTree
@@ -130,8 +130,21 @@ def get_affiliations (artWrapper, datamodel):
 		
 		affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
 	
+	
+	# Also check for email addresses that are linked to certain authors. Will only record email addresses, and not any other correspondence text.
+	correspondences = artWrapper.findall(datamodel['correspondence'])
+	correspondences = list(result for result in correspondences) #turn it into a list
+	
+	for corres in correspondences:
+		if corres.attrib.get(datamodel['correspondenceIdentifier']) != None:
+			corresId = corres.attrib.get(datamodel['correspondenceIdentifier'])
+			corresId = value_cleanup(corresId)
+			
+			if corres.find(datamodel['email']) != None:
+				email = corres.find(datamodel['email'])
+				affiliationData[corresId] = value_cleanup(get_text(email))
+	
 	return affiliationData
-	# END
 
 def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 #Create a graph for each article author, then use the URI of that graph as the identifier in the article graph
@@ -142,10 +155,10 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 		authorData = {}
 		for metaField in datamodel['authorMetadata'].keys():
 			data = 0
-			if metaField != 'affiliationRef':
+			if metaField != 'affiliationRef' and metaField != 'correspondenceRef':
 				data = eachAuthor.findall(datamodel['authorMetadata'][metaField])
 				data = list(get_text(result) for result in data) #turn it into a list
-			elif metaField == 'affiliationRef':
+			elif metaField == 'affiliationRef' or metaField == 'correspondenceRef':
 				element = eachAuthor.find(datamodel['authorMetadata'][metaField])
 				if element == None:
 					continue
@@ -166,6 +179,16 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 			#Otherwise just link it to the one only affiliation
 			elif affiliationData.has_key('dummyRef'):
 				authorData['affiliation'] = affiliationData['dummyRef']
+			
+			if authorData.has_key('correspondenceRef'):
+				# Replace the affiliationRef field with an affiliation field
+				correspondenceRef = authorData['correspondenceRef'] 
+				if affiliationData.has_key(correspondenceRef):
+					correspondence = affiliationData[correspondenceRef]
+					authorData['email'] = correspondence
+				else:
+					print "Author correspondence ref %s could not be resolved to correspondence details." % correspondenceRef
+				del authorData['correspondenceRef']
 		
 		knownAuthor = check_knownAuthors(authorData, triples)
 		
@@ -210,6 +233,9 @@ def read_xml (inputFile, authorities):
 	xmlRoot = ElementTree.fromstring(inputString) 
 	
 	datamodel = get_datamodel() # Imports the (NLM) datamodel as a multidimensional dictionary object
+	dataModelNamespaces = get_namespaces()
+	for k, v in dataModelNamespaces.items():
+		ElementTree.register_namespace(k, v)
 	
 	#Get the block of article metadata info, using the datamodel to navigate the xml
 	artWrapper = xmlRoot.find(datamodel['artWrapperElement'])
@@ -228,15 +254,25 @@ def read_xml (inputFile, authorities):
 	for elementName in datamodel['artMetadata'].keys():
 		data = artWrapper.findall(datamodel['artMetadata'][elementName])
 		data = list(result for result in data) #turn it into a list
+		
+		#Special treatment for author metadata
 		if elementName=='artAuthor':
 			triples = add_author_data(triples, data, datamodel, affiliationData, artIdentifier)
-			
-		#It's not the author data
+		
+		#It's other standard metadata
 		else:
 			data = list(get_text(result) for result in data) # make it a list of strings
 			if data != []:
 				data = value_cleanup(data)
 				triples[artIdentifier][elementName] = data
+	
+	#Some special treatment of the license info, to extract a link to the license URL if there is one
+	if triples[artIdentifier].has_key('licenseStatement'):
+		license = artWrapper.find(datamodel['artMetadata']['licenseStatement'])
+		licenseURL = license.attrib.get(datamodel['licenseURL'])
+		if licenseURL != None:
+			licenseURL = value_cleanup(licenseURL)
+			triples[artIdentifier]['licenseURL'] = licenseURL
 	
 	#Make a graph for each cited work in the references section
 	refList = xmlRoot.findall(datamodel['refElement'])

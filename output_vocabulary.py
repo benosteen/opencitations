@@ -10,17 +10,38 @@ def get_vocabulary (input):
 		'refAuthor': 'terms:creator',
 		'authorGivenName': 'foaf:firstName',
 		'authorMainName': 'foaf:familyName',
+		'qualifications': '__qualifications',
 		'affiliation': 'foaf:member',
+		#'correspondence': '__correspondence',
+		'email': '__email',
+		
 		'institution': 'foaf:name',
 		'address': 'v:adr',
 		
-		'artJournal': 'bibtex:hasJournal',  # what to use here?
+		#Various ids
+		'pubmedcentralId': '__pubmedcentralId',
+		'pubmedId': '__pubmedId',
+		'publishersId': '__publishersId',
+		
+		'journalTitle': '__journalTitle',  # what to use here?
+		'pubmedJournalAbbrev': '__pubmedJournalAbbrev',
+		'journalIssnPrint': '__journalIssnPrint',
+		'journalIssnElectronic': '__journalIssnElectronic',
+		'publisherName': '__publisherName',
+		
 		'artVolume': 'prism:volume', 
+		'artIssue': 'prism:issue',
 		'artTitle': 'dc:title',
+		
 		'artPubYear': '__printPublicationYear', # Will later need to be restructured as frbr:embodiment	[[rdf:type	print-object; fabio:hasPublicationYear	"YYYY"], [rdf:type	digital-information-object; fabio:hasPublicationYear	"YYYY"]]
 		'artEpubYear': '__ePublicationYear', # As with previous
 		'artFirstPage': 'prism:startingPage', 
 		'artLastPage': 'prism:endingPage',
+		
+		'copyRightStatement': '__copyRightStatement',
+		'licenseStatement': '__licenseStatement',
+		'licenseURL': '__licenseURL',
+		
 		'refJournal': 'bibtex:hasJournal', 
 		'refVolume': 'prism:volume',
 		'refFirstPage': 'prism:startingPage', 

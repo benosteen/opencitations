@@ -47,17 +47,22 @@ def value_cleanup (values):
 			# Some syntax cleanup
 			if re.search("^'.+'$", value):
 				value = re.sub("^'(.+)'$", r'"\1"', value) #Change single quotes to doubles
-			elif not re.search("^['\"<].+['\">]$", value): #Add quotes where they are needed (not working!)
+			elif not re.search("^['\"<].+['\">]$", value): #Add quotes where they are needed
 				value = re.sub("^(.+)$", r'"\1"', value)
 				
+			if re.search('(\n|\t|  )', value): #Normalise whitespace
+				value = re.sub("(\n|\t|  )", " ", value)
+			
 			family_values.append(value)
 	elif type(values).__name__=='str':
 		# Some syntax cleanup
 		if re.search("^'.+'$", values):
 			values = re.sub("^'(.+)'$", r'"\1"', values) #Change single quotes to doubles
-		elif not re.search("^['\"<].+['\">]$", values): #Add quotes where they are needed (not working!)
+		elif not re.search("^['\"<].+['\">]$", values): #Add quotes where they are needed
 			values = re.sub("^(.+)$", r'"\1"', values)
-				
-			family_values = values
+		if re.search('(\n|\t|  )', values): #Normalise whitespace
+				values = re.sub("(\n|\t|  )", " ", values)
+		
+		family_values = values
 	
 	return family_values
