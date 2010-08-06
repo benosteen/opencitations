@@ -10,16 +10,17 @@ from namespace_authorities import get_nsAuthorities
 from output_vocabulary import get_vocabulary
 from dir_navigator import Walk
 from check_fulltext import check_fulltext
+from restructure_data import restructure_data
 
 # Creates custom sort-keys, so that graphs can be output in an order more readable for humans
 def sort_graphs(subject):
 	graphType = 0
 	
-	if triples[subject]['entityType']=='fabio:Document' and triples[subject].has_key('references'):  #It's the citing article graph
+	if triples[subject]['rdf:type']=='fabio:Document' and triples[subject].has_key('cito:cites'):  #It's the citing article graph
 		graphType = '00-'
-	elif triples[subject]['entityType']=='fabio:Document': #It's an article - either a cited article, or an article that abstract that simply has no citations
+	elif triples[subject]['rdf:type']=='fabio:Document': #It's an article - either a cited article, or an article that abstract that simply has no citations
 		graphType = '01-'
-	elif triples[subject]['entityType']=='foaf:Person': #It's an author graph
+	elif triples[subject]['rdf:type']=='foaf:Person': #It's an author graph
 		graphType = '02-'
 	else:
 		print "Graph type unknown"
@@ -32,54 +33,73 @@ def sort_graphs(subject):
 def sort_predicates(predicate):
 	sortKey = 0
 	
-	if predicate=='entityType':  # rdf:type first
+	if predicate=='rdf:type':  # rdf:type first
 		sortKey = '00'
-	elif predicate=='artAuthor':  # then author(s)
+	elif predicate=='dc:creator':  # then author(s)
 		sortKey = '01'
-	elif predicate=='refAuthor':  # author(s)
-		sortKey = '02'
+	elif predicate=='frbr:partOf':  # put partOf relation to the end, because it nests into a subgraph
+		sortKey = 'zz'
 	else:
 		sortKey = predicate # All other predicates just get sorted according to their actual name
 	
 	return sortKey
 
+def print_indent (depth):
+	indent = 0
+	while indent < depth:
+		outputFile.write('\t')
+		indent += 1
+
+# A recursive function, that prints out dictionary contents, and recurses through sub-dictionaries
+def print_dictionary (dict, depth):
+	for key in sorted(dict.keys(), key=sort_predicates):
+		print_indent(depth)
+		outputFile.write(key + '\t')
+		if type(dict[key]).__name__=='str':
+			toprint = dict[key]
+			outputFile.write(toprint + ';\n')
+		elif type(dict[key]).__name__=='list':
+			toprint = ", ".join(dict[key])
+			outputFile.write(toprint + ';\n')
+		elif type(dict[key]).__name__=='dict':
+			depth += 1
+			outputFile.write('[\n')
+			print_dictionary(dict[key], depth)
+			print_indent(depth-1)
+			outputFile.write(']\n')
+			depth -= 1
+		else:
+			"Unexpected data type for output value: " + str(type(dict[key]).__name__)
+			
 def output_turtle (triples):
 	hasMetadata = hasRefs = 0
 	for subject in sorted(triples.keys(), key=sort_graphs): #Uses our custom sort function
 		outputFile.write(subject + "\n")
 		
-		if triples[subject].has_key('artAuthor'):
+		if triples[subject].has_key('dc:creator'):
 			hasMetadata = 1  # At least some article metadata has been recorded
 			
-		if triples[subject].has_key('refAuthor'):
+		if triples[subject].has_key('cito:cites'):
 			hasRefs = 1  # At least some references have been recorded
 		
 		pos = 0 #position as we cycle through the list of keys
 		for predicate in sorted(triples[subject].keys(), key=sort_predicates): # Another custom sort
 			values = triples[subject][predicate]
+			
+			outputFile.write("\t" + predicate + "\t") 
 			# # # Here we are going to make sure the output value is a string
 			if type(values).__name__=='dict':
-				valueList = []
-				for key in values.keys():
-					value = 0
-					if type(values[key]).__name__=='str':
-						value = values[key]
-					elif type(values[key]).__name__=='list':
-						value = str(", ".join(values[key]))
-					displayKey = str(get_vocabulary(key))
-					valueList.append(displayKey + ' "' + value + '"')
-				valueString = "[\n\t\t" + str(";\n\t\t".join(valueList)) + "\n\t]"
-				values = valueString
-			if type(values).__name__=='str':
-				values = values #It's already a string
+				outputFile.write('[\n')
+				print_dictionary(values, depth=2) #Send it to a recursive dictionary printer (can go as deep as required)
+				print_indent(depth=1)
+				outputFile.write(']')
+			elif type(values).__name__=='str':
+				outputFile.write(values)
 			elif type(values).__name__=='list':
-				values = str(", ".join(values))
+				outputFile.write(", ".join(values))
 			else:
 				print "Unexpected data type for output value: " + str(type(values).__name__)
-			# # #
-				
-			displayPredicate = str(get_vocabulary(predicate))
-			outputFile.write("\t" + displayPredicate + "\t" + values)
+			
 			
 			#Last one should be followed by full stop
 			if pos + 1 == len(triples[subject].keys()):
@@ -171,6 +191,12 @@ for inputFileName in sorted(sourceFiles):
 
 	#Read the inputFile in to a triples dictionary. In fact it will be a multidimensional dictionary, taking the form triples[subject][predicate]
 	triples = read_triples(inputFile, inputFormat, authorities)
+	
+	#Restructure data graphs, one by one
+	for graph in triples.keys():
+		# List of fields to be restructured
+		inputFields = ['prism:issue', 'prism:volume', '__journalTitle']
+		triples[graph] = restructure_data(triples[graph], inputFields)
 
 	#Check whether input article (if it is an xml document) contains fulltext
 	inputFile = open(inputFileName, 'r')

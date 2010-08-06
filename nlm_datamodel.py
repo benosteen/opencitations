@@ -1,3 +1,9 @@
+# Note on conventions:
+
+# -  anything starting with doubled __underscore is yet to be decided what predicate should be used
+# - things with no prefix, like fulltextElement, are not used as output predicated, but as steps in processing
+
+
 def get_datamodel ():
 	#This maps the information we need onto the NLM xml elements
 	datamodel = {}
@@ -9,68 +15,68 @@ def get_datamodel ():
 	
 	datamodel['artMetadata'] = {
 		#Various identifiers
-		'pubmedcentralId': './/article-id[@pub-id-type="pmc"]', #Note this is the same xml node used to create a URI for the article graph, at 'artIdentifierElement' above
-		'pubmedId': './/article-id[@pub-id-type="pmid"]',
-		'publishersId': './/article-id[@pub-id-type="publisher-id"]',
+		'__pubmedcentralId': './/article-id[@pub-id-type="pmc"]', #Note this is the same xml node used to create a URI for the article graph, at 'artIdentifierElement' above
+		'__pubmedId': './/article-id[@pub-id-type="pmid"]',
+		'__publishersId': './/article-id[@pub-id-type="publisher-id"]',
 		
-		'artTitle': './/article-title',
-		'artAuthor': './/contrib[@contrib-type="author"]',
+		'dc:title': './/article-title',
+		'dc:creator': './/contrib[@contrib-type="author"]',
 		
 		#Journal details
-		'pubmedJournalAbbrev': './/journal-id[@journal-id-type="nlm-ta"]',
-		'journalTitle': './/journal-title',
-		'journalIssnPrint': './/issn[@pub-type="ppub"]',
-		'journalIssnElectronic': './/issn[@pub-type="epub"]',
-		'publisherName': './/publisher-name',
+		'__pubmedJournalAbbrev': './/journal-id[@journal-id-type="nlm-ta"]',
+		'__journalTitle': './/journal-title',
+		'__journalIssnPrint': './/issn[@pub-type="ppub"]',
+		'__journalIssnElectronic': './/issn[@pub-type="epub"]',
+		'__publisherName': './/publisher-name',
 		
-		'artVolume': './/volume',
-		'artIssue': './/issue',
-		'artFirstPage': './/fpage',
-		'artLastPage': './/lpage',
+		'prism:volume': './/volume',
+		'prism:issue': './/issue',
+		'prism:startingPage': './/fpage',
+		'prism:endingPage': './/lpage',
 		
 		#Date
-		'artPubYear': './/pub-date[@pub-type="ppub"]/year',
-		'artEpubYear': './/pub-date[@pub-type="epub"]/year',
+		'__printPublicationYear': './/pub-date[@pub-type="ppub"]/year',
+		'__ePublicationYear': './/pub-date[@pub-type="epub"]/year',
 		
 		#Copyright
-		'copyRightStatement': './/copyright-statement',
-		'licenseStatement': './/license'
+		'__copyRightStatement': './/copyright-statement',
+		'__licenseStatement': './/license'
 	}
 	
-	datamodel['licenseURL'] = '{http://www.w3.org/1999/xlink}href' # This is an attribute that has a namespace - note the syntax in which the namespace has to be provided, and that it must be the *real namespace*, not the prefix used to represent it inline
+	datamodel['__licenseURL'] = '{http://www.w3.org/1999/xlink}href' # This is an attribute that has a namespace - note the syntax in which the namespace has to be provided, and that it must be the *real namespace*, not the prefix used to represent it inline
 	
 	datamodel['refElement'] = './/ref' #The wrapper for a single citation in the references list
 	datamodel['refIdentifierElement'] = './/pub-id[@pub-id-type="pmid"]'
 	datamodel['refIdentifierBase'] = 'ukpmc.ac.uk/pmid/'
 	
 	datamodel['refMetadata'] = {
-		'refTitle': './/article-title',
-		'refAuthor': './/name',
-		'refJournal': './/source',
-		'refFirstPage': './/fpage',
-		'refLastPage': './/lpage',
-		'refVolume': './/volume',
-		'refYear': './/year'
+		'dc:title': './/article-title',
+		'dc:creator': './/name',
+		'__journalTitle': './/source',
+		'prism:startingPage': './/fpage',
+		'prism:endingPage': './/lpage',
+		'prism:volume': './/volume',
+		'fabio:hasPublicationYear': './/year'
 		#'': '',
 	}
 	
 	datamodel['authorMetadata'] = {
-		'authorGivenName': './/given-names',
-		'authorMainName': './/surname',
+		'foaf:firstName': './/given-names',
+		'foaf:familyName': './/surname',
 		'affiliationRef': ".//xref[@ref-type='aff']",
 		'correspondenceRef': ".//xref[@ref-type='corresp']",
-		'qualifications': './/degrees'
+		'__qualifications': './/degrees'
 	}
 	
 	datamodel['correspondence'] = './/corresp'
 	datamodel['correspondenceIdentifier'] = 'id'
-	datamodel['email'] = './/email'
+	datamodel['__email'] = './/email'
 	
 	datamodel['affiliationWrapper'] = './/aff'
 	datamodel['affiliationIdentifier'] = 'id'
 	datamodel['affiliation'] = {
-		'institution': './/institution',
-		'address': './/addr-line'
+		'foaf:name': './/institution',
+		'v:adr': './/addr-line'
 	}
 	return datamodel
 	

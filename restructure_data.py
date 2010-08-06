@@ -1,11 +1,10 @@
-def restructure_data (inputGraph):
+def restructure_data (inputGraph, inputFields):
+	#print inputGraph
 	
 	rsGraph = {}
 	
-	# List of fields to be restructured
-	inputFields = ['prism:issue', 'prism:volume', '__journalTitle']
-	
-	#Check that the graph has each of the required input fields, otherwise bail out
+	#Only do the restructuring if this graph contains all the fields to be restructured
+	missingField = None
 	for field in inputFields:
 		if not inputGraph.has_key(field):
 			return inputGraph
@@ -18,7 +17,7 @@ def restructure_data (inputGraph):
 				'rdf:type': 'fabio:JournalVolume',
 				'prism:volume': inputGraph['prism:volume'],
 				'frbr:partOf': {
-					'rdf:type': 'Journal',
+					'rdf:type': 'fabio:Journal',
 					'fabio:hasTitle': inputGraph['__journalTitle']
 				}
 			}

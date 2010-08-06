@@ -95,7 +95,7 @@ def get_affiliations (artWrapper, datamodel):
 				textString = re.sub('<sup( [^>]+)?>.+?</sup>', '', textString)
 				aff = ElementTree.fromstring(textString)
 				
-				affiliationData[affiliationId]['description'] = get_text(aff)
+				affiliationData[affiliationId]['dc:description'] = get_text(aff)
 			affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
 			#print affiliationData[affiliationId]
 	
@@ -126,7 +126,7 @@ def get_affiliations (artWrapper, datamodel):
 			textString = re.sub('<sup( [^>]+)?>.+?</sup>', '', textString)
 			aff = ElementTree.fromstring(textString)
 				
-			affiliationData[affiliationId]['description'] = get_text(aff)
+			affiliationData[affiliationId]['dc:description'] = get_text(aff)
 		
 		affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
 	
@@ -140,8 +140,8 @@ def get_affiliations (artWrapper, datamodel):
 			corresId = corres.attrib.get(datamodel['correspondenceIdentifier'])
 			corresId = value_cleanup(corresId)
 			
-			if corres.find(datamodel['email']) != None:
-				email = corres.find(datamodel['email'])
+			if corres.find(datamodel['__email']) != None:
+				email = corres.find(datamodel['__email'])
 				affiliationData[corresId] = value_cleanup(get_text(email))
 	
 	return affiliationData
@@ -185,7 +185,7 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 				correspondenceRef = authorData['correspondenceRef'] 
 				if affiliationData.has_key(correspondenceRef):
 					correspondence = affiliationData[correspondenceRef]
-					authorData['email'] = correspondence
+					authorData['__email'] = correspondence
 				else:
 					print "Author correspondence ref %s could not be resolved to correspondence details." % correspondenceRef
 				del authorData['correspondenceRef']
@@ -201,13 +201,13 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 			authorId = "<"+str(authorId.hexdigest())+">"
 			authorURIs.append(authorId)
 			triples[authorId] = {}
-			triples[authorId]['entityType'] = 'foaf:Person'
+			triples[authorId]['rdf:type'] = 'foaf:Person'
 			for metaField in authorData.keys():
 				content = authorData[metaField]
 				triples[authorId][metaField] = content
 	
 	authorURIs = value_cleanup(authorURIs)
-	triples[artIdentifier]['artAuthor'] = authorURIs
+	triples[artIdentifier]['dc:creator'] = authorURIs
 	
 	return triples
 
@@ -245,7 +245,7 @@ def read_xml (inputFile, authorities):
 	artIdentifier = "<"+str(datamodel['artIdentifierBase'])+get_text(artIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
 	
 	triples[artIdentifier] = {} # Create a dictionary object for the article
-	triples[artIdentifier]['entityType'] = 'fabio:Document' # It may be something more specific, but we don't know that yet
+	triples[artIdentifier]['rdf:type'] = 'fabio:Document' # It may be something more specific, but we don't know that yet
 	
 	# Before going on to collect other article metadata, collect the author affiliations data, which will be used in building graphs for the article authors
 	affiliationData = get_affiliations(artWrapper, datamodel)
@@ -256,7 +256,7 @@ def read_xml (inputFile, authorities):
 		data = list(result for result in data) #turn it into a list
 		
 		#Special treatment for author metadata
-		if elementName=='artAuthor':
+		if elementName=='dc:creator':
 			triples = add_author_data(triples, data, datamodel, affiliationData, artIdentifier)
 		
 		#It's other standard metadata
@@ -267,12 +267,12 @@ def read_xml (inputFile, authorities):
 				triples[artIdentifier][elementName] = data
 	
 	#Some special treatment of the license info, to extract a link to the license URL if there is one
-	if triples[artIdentifier].has_key('licenseStatement'):
-		license = artWrapper.find(datamodel['artMetadata']['licenseStatement'])
-		licenseURL = license.attrib.get(datamodel['licenseURL'])
+	if triples[artIdentifier].has_key('__licenseStatement'):
+		license = artWrapper.find(datamodel['artMetadata']['__licenseStatement'])
+		licenseURL = license.attrib.get(datamodel['__licenseURL'])
 		if licenseURL != None:
 			licenseURL = value_cleanup(licenseURL)
-			triples[artIdentifier]['licenseURL'] = licenseURL
+			triples[artIdentifier]['__licenseURL'] = licenseURL
 	
 	#Make a graph for each cited work in the references section
 	refList = xmlRoot.findall(datamodel['refElement'])
@@ -290,7 +290,7 @@ def read_xml (inputFile, authorities):
 			refIdentifier = "<"+str(datamodel['refIdentifierBase'])+get_text(refIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
 
 		triples[refIdentifier] = {} # Create a dictionary entry for the ref
-		triples[refIdentifier]['entityType'] = 'fabio:Document'
+		triples[refIdentifier]['rdf:type'] = 'fabio:Document'
 		
 		#And now get each of the reference metadata fields from the ref
 		for elementName in datamodel['refMetadata'].keys():
@@ -298,7 +298,7 @@ def read_xml (inputFile, authorities):
 			data = list(result for result in data) #turn it into a list 
 			#print data
 			
-			if elementName=='refAuthor':
+			if elementName=='dc:creator':
 				triples = add_author_data(triples, data, datamodel, None, refIdentifier)
 			
 			else:
@@ -312,7 +312,7 @@ def read_xml (inputFile, authorities):
 	#And for each reference add a triple to the article graph
 	refIDs = value_cleanup(refIDs)
 	if refIDs != []:
-		triples[artIdentifier]['references'] = refIDs
+		triples[artIdentifier]['cito:cites'] = refIDs
 	
 	return triples
 
