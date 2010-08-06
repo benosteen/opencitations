@@ -1,3 +1,7 @@
+# # # # # # # #
+# DEPRECATED! #
+# # # # # # # #
+
 import re
 
 def get_vocabulary (input):
