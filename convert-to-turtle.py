@@ -188,15 +188,12 @@ for inputFileName in sorted(sourceFiles):
 
 	outputFile.write("\n")
 
-
 	#Read the inputFile in to a triples dictionary. In fact it will be a multidimensional dictionary, taking the form triples[subject][predicate]
 	triples = read_triples(inputFile, inputFormat, authorities)
 	
 	#Restructure data graphs, one by one
 	for graph in triples.keys():
-		# List of fields to be restructured
-		inputFields = ['prism:issue', 'prism:volume', '__journalTitle']
-		triples[graph] = restructure_data(triples[graph], inputFields)
+		triples[graph] = restructure_data(triples[graph])
 
 	#Check whether input article (if it is an xml document) contains fulltext
 	inputFile = open(inputFileName, 'r')

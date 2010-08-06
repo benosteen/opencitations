@@ -140,9 +140,11 @@ def get_affiliations (artWrapper, datamodel):
 			corresId = corres.attrib.get(datamodel['correspondenceIdentifier'])
 			corresId = value_cleanup(corresId)
 			
-			if corres.find(datamodel['__email']) != None:
-				email = corres.find(datamodel['__email'])
-				affiliationData[corresId] = value_cleanup(get_text(email))
+			if corres.find(datamodel['v:email']) != None: # If there is an email address, get that
+				email = corres.find(datamodel['v:email'])
+				affiliationData[corresId] = {'v:email': value_cleanup(get_text(email))}
+			else: # Otherwise get whatever kind of unstructured contact details are available
+				affiliationData[corresId] = {'v:adr': value_cleanup(get_text(corres))}
 	
 	return affiliationData
 
@@ -185,7 +187,7 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 				correspondenceRef = authorData['correspondenceRef'] 
 				if affiliationData.has_key(correspondenceRef):
 					correspondence = affiliationData[correspondenceRef]
-					authorData['__email'] = correspondence
+					authorData['v:vcard'] = correspondence
 				else:
 					print "Author correspondence ref %s could not be resolved to correspondence details." % correspondenceRef
 				del authorData['correspondenceRef']

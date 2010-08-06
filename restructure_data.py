@@ -1,36 +1,41 @@
-def restructure_data (inputGraph, inputFields):
-	#print inputGraph
+def restructure_data (inputGraph):
 	
 	rsGraph = {}
+	newStructures = {}
 	
-	#Only do the restructuring if this graph contains all the fields to be restructured
-	missingField = None
-	for field in inputFields:
-		if not inputGraph.has_key(field):
-			return inputGraph
-	
-	outputStructure = {
-		'frbr:partOf': {
+	#The re-structuring of some fields is dependent on others, hence the cascading dependencies
+	pred = 'prism:issue'
+	if inputGraph.has_key(pred):
+		newStructures['frbr:partOf'] = {
 			'rdf:type': 'fabio:JournalIssue',
-			'prism:issue': inputGraph['prism:issue'],
-			'frbr:partOf': {
-				'rdf:type': 'fabio:JournalVolume',
-				'prism:volume': inputGraph['prism:volume'],
-				'frbr:partOf': {
-					'rdf:type': 'fabio:Journal',
-					'fabio:hasTitle': inputGraph['__journalTitle']
-				}
-			}
+			pred: inputGraph[pred]
 		}
-	}
-	
-	# Write the output structure to our new graph
-	for field in outputStructure.keys():
-		rsGraph[field] = outputStructure[field]
+		del inputGraph[pred]
 		
-	#Remove the restructured fields from inputGraph
-	for field in inputFields:
-		del inputGraph[field]
+		pred = 'prism:volume'
+		if inputGraph.has_key(pred):
+			newStructures['frbr:partOf']['frbr:partOf'] = {
+				'rdf:type': 'fabio:JournalVolume',
+				pred: inputGraph[pred]
+			}
+			del inputGraph['prism:volume']
+			
+			pred = '__journalTitle'
+			if inputGraph.has_key(pred):
+				newStructures['frbr:partOf']['frbr:partOf']['frbr:partOf'] = {
+					'rdf:type': 'fabio:Journal',
+					'fabio:hasTitle': inputGraph[pred]
+				}
+				del inputGraph[pred]
+				
+				for pred in ('__journalIssnElectronic', '__journalIssnPrint', '__publisherName', '__journalIdInternal', '__pubmedJournalAbbrev'):
+					if inputGraph.has_key(pred):
+						newStructures['frbr:partOf']['frbr:partOf']['frbr:partOf'][pred] = inputGraph[pred]
+						del inputGraph[pred]
+	
+	# Write the new structures to our new graph
+	for field in newStructures.keys():
+		rsGraph[field] = newStructures[field]
 		
 	#Now add all the remaining inputfields to the restructured graph
 	for field in inputGraph.keys():

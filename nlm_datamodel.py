@@ -17,7 +17,7 @@ def get_datamodel ():
 		#Various identifiers
 		'__pubmedcentralId': './/article-id[@pub-id-type="pmc"]', #Note this is the same xml node used to create a URI for the article graph, at 'artIdentifierElement' above
 		'__pubmedId': './/article-id[@pub-id-type="pmid"]',
-		'__publishersId': './/article-id[@pub-id-type="publisher-id"]',
+		'__articleIdInternal': './/article-id[@pub-id-type="publisher-id"]',
 		
 		'dc:title': './/article-title',
 		'dc:creator': './/contrib[@contrib-type="author"]',
@@ -28,6 +28,7 @@ def get_datamodel ():
 		'__journalIssnPrint': './/issn[@pub-type="ppub"]',
 		'__journalIssnElectronic': './/issn[@pub-type="epub"]',
 		'__publisherName': './/publisher-name',
+		'__journalIdInternal': './/journal-id[@journal-id-type="publisher-id"]',
 		
 		'prism:volume': './/volume',
 		'prism:issue': './/issue',
@@ -70,7 +71,7 @@ def get_datamodel ():
 	
 	datamodel['correspondence'] = './/corresp'
 	datamodel['correspondenceIdentifier'] = 'id'
-	datamodel['__email'] = './/email'
+	datamodel['v:email'] = './/email'
 	
 	datamodel['affiliationWrapper'] = './/aff'
 	datamodel['affiliationIdentifier'] = 'id'
