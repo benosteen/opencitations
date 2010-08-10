@@ -29,10 +29,8 @@ def check_knownAuthors (authorData, triples):
 			if type(value).__name__=='dict':
 				for key in existingAuthors[entity][metaField].keys():
 					if not existingAuthors[entity][metaField][key] == value[key]:
-						#print "throwaway1"
 						del existingAuthors[entity] #throw it away
 			elif not existingAuthors[entity][metaField] == value:
-				#print "throwaway2"
 				del existingAuthors[entity] #throw it away
 	
 	#whatever is left must have all the same param values - i.e. it's a match

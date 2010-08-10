@@ -6,7 +6,6 @@ import re
 import sys
 from rdf_string_cleanup import predicate_cleanup
 from rdf_string_cleanup import value_cleanup
-from nlm_datamodel import get_datamodel, get_namespaces
 from hashlib import md5
 from check_knownAuthors import check_knownAuthors
 from elementtree import ElementTree
@@ -51,10 +50,6 @@ def read_nTriples (inputFile, authorities):
 			
 	return triples
 
-def make_matchString (elementName):
-	matchString = '<'+str(elementName)+'( [^>]+)?>(.+?)</'+str(re.sub(' .+$', '', elementName))+'>'
-	return matchString
-
 
 #Helper function I had to write, because ElementTree's text parser is really bad!
 def get_text (xmlElement):
@@ -67,13 +62,13 @@ def get_text (xmlElement):
 # For extracting author affiliations; decided to make this a separate function (compared to other content extraction) because it's rather complicated
 def get_affiliations (artWrapper, datamodel):
 	affiliationData = {}
-	affiliations = artWrapper.findall(datamodel['affiliationWrapper'])
+	affiliations = artWrapper.findall(datamodel['wrappers']['affiliationWrapper'])
 	affiliations = list(result for result in affiliations) #turn it into a list
 	
 	#If there are multiple affiliations, then analyse them separately so that authors can be linked to them separately
 	if len(affiliations) > 1:
 		for aff in affiliations:
-			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
+			affiliationId = aff.attrib.get(datamodel['identifiers']['affiliationIdentifier'])
 			if affiliationId == None:
 				print "Multiple affiliations, but at least one of the affiliations lacks an ID that allows it to be associated with particular authors"
 				continue
@@ -83,7 +78,7 @@ def get_affiliations (artWrapper, datamodel):
 			for elementName in datamodel['affiliation'].keys():
 				data = aff.findall(datamodel['affiliation'][elementName])
 				data = list(get_text(result) for result in data) # listify
-				if data != []:
+				if data:
 					data = value_cleanup(data)
 					affiliationData[affiliationId][elementName] = data
 			#Sometimes the affiliation data is unstructured, so:
@@ -97,15 +92,14 @@ def get_affiliations (artWrapper, datamodel):
 				
 				affiliationData[affiliationId]['dc:description'] = get_text(aff)
 			affiliationData[affiliationId]['rdf:type'] = ['foaf:Organization']
-			#print affiliationData[affiliationId]
 	
 	# Otherwise, just describe one affiliation (and give it a 'dummyRef'
 	elif len(affiliations) == 1:
 		aff = affiliations[0]
 		# Sometimes there will still be an identifier, even on a single affiliation
 		affiliationId = 0
-		if aff.attrib.get(datamodel['affiliationIdentifier']):
-			affiliationId = aff.attrib.get(datamodel['affiliationIdentifier'])
+		if aff.attrib.get(datamodel['identifiers']['affiliationIdentifier']):
+			affiliationId = aff.attrib.get(datamodel['identifiers']['affiliationIdentifier'])
 			affiliationId = value_cleanup(affiliationId)
 		else: #otherwise use this pseudo-identifier
 			affiliationId = 'dummyRef'
@@ -113,7 +107,7 @@ def get_affiliations (artWrapper, datamodel):
 		affiliationData[affiliationId] = {}
 		for elementName in datamodel['affiliation'].keys():
 			data = aff.find(datamodel['affiliation'][elementName])
-			if data != None:
+			if data:
 				data = value_cleanup(get_text(data))
 				affiliationData[affiliationId][elementName] = data
 		
@@ -132,16 +126,16 @@ def get_affiliations (artWrapper, datamodel):
 	
 	
 	# Also check for email addresses that are linked to certain authors. Will only record email addresses, and not any other correspondence text.
-	correspondences = artWrapper.findall(datamodel['correspondence'])
+	correspondences = artWrapper.findall(datamodel['correspondence']['correspondence'])
 	correspondences = list(result for result in correspondences) #turn it into a list
 	
 	for corres in correspondences:
-		if corres.attrib.get(datamodel['correspondenceIdentifier']) != None:
-			corresId = corres.attrib.get(datamodel['correspondenceIdentifier'])
+		if corres.attrib.get(datamodel['correspondence']['correspondenceIdentifier']):
+			corresId = corres.attrib.get(datamodel['correspondence']['correspondenceIdentifier'])
 			corresId = value_cleanup(corresId)
 			
-			if corres.find(datamodel['v:email']) != None: # If there is an email address, get that
-				email = corres.find(datamodel['v:email'])
+			if corres.find(datamodel['correspondence']['v:email']): # If there is an email address, get that
+				email = corres.find(datamodel['correspondence']['v:email'])
 				affiliationData[corresId] = {'v:email': value_cleanup(get_text(email))}
 			else: # Otherwise get whatever kind of unstructured contact details are available
 				affiliationData[corresId] = {'v:adr': value_cleanup(get_text(corres))}
@@ -162,15 +156,15 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 				data = list(get_text(result) for result in data) #turn it into a list
 			elif metaField == 'affiliationRef' or metaField == 'correspondenceRef':
 				element = eachAuthor.find(datamodel['authorMetadata'][metaField])
-				if element == None:
+				if not element:
 					continue
 				data = element.attrib.get('rid') #Need to do this extra step - only way ElementTree allows you to get an attribute from a descendant element (not directly supported in their "find" xpath function
 			data = value_cleanup(data)
 			
-			if data != [] and data != None:
+			if data:
 				authorData[metaField] = data
 		
-		if affiliationData != None:
+		if affiliationData:
 			#If the author has a ref to one of multiple affiliations listed, record that as their affiliation
 			if authorData.has_key('affiliationRef'):
 				# Replace the affiliationRef field with an affiliation field
@@ -194,7 +188,7 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 		
 		knownAuthor = check_knownAuthors(authorData, triples)
 		
-		if not knownAuthor==None: #Already seen this author before
+		if knownAuthor: #Already seen this author before
 			authorURIs.append(knownAuthor)
 			
 		else: #New author, create a URI and a graph in triples
@@ -224,27 +218,43 @@ def read_xml (inputFile, authorities):
 	doctype = 0
 	matches = re.findall('<!DOCTYPE[^>]+>', inputString, re.IGNORECASE)
 	if not len(matches)==1: #We want one doctype, and one only
-		sys.exit("XML input has no doctype, or multiple doctypes")
+		#sys.exit("XML input has no doctype, or multiple doctypes")
+		print "XML input has no doctype, or multiple doctypes"
+		return triples
 	else:
 		doctype = matches[0]
 		
 	# Is it NLM markup? ... For the moment this is the only datamodel we will accept
 	if not re.search('nlm', doctype, re.IGNORECASE):
-		sys.exit("XML input has some DTD that is not NLM. Will need to extend the code to deal with a range of DTDs.")
+		#sys.exit("XML input has some DTD that is not NLM. Will need to extend the code to deal with a range of DTDs.")
+		print "XML input has some DTD that is not NLM. Will need to extend the code to deal with a range of DTDs."
+		return triples
 	
 	xmlRoot = ElementTree.fromstring(inputString) 
 	
-	datamodel = get_datamodel() # Imports the (NLM) datamodel as a multidimensional dictionary object
-	dataModelNamespaces = get_namespaces()
-	for k, v in dataModelNamespaces.items():
+	from MyConfigParser import MyConfigParser  #Uses my own modified version of ConfigParser, to facilitate character escaping
+	#Get namespace authorities from separate manifest
+	config = MyConfigParser()
+	config.read('nlm_datamodel.cfg')
+	#Read the config into a standard dictionary object (mostly just to avoid rewriting the existing code which reads the config from a dictionary)
+	datamodel = {}
+	for section in config.sections():
+		datamodel[section] = {}
+		for key in config.options(section):
+			datamodel[section][key] = config.get(section, key)
+	
+	#Register the datamodel's xml namespaces with ElementTree
+	for k, v in datamodel['xmlNamespaces'].items():
 		ElementTree.register_namespace(k, v)
 	
 	#Get the block of article metadata info, using the datamodel to navigate the xml
-	artWrapper = xmlRoot.find(datamodel['artWrapperElement'])
+	artWrapper = xmlRoot.find(datamodel['wrappers']['artWrapperElement'])
 	
 	#From the artWrapper, get the unique article identifier
-	artIdentifier = artWrapper.find(datamodel['artIdentifierElement'])
-	artIdentifier = "<"+str(datamodel['artIdentifierBase'])+get_text(artIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
+	artIdentifier = artWrapper.find(datamodel['identifiers']['artIdentifierElement'])
+	if artIdentifier == None:
+		print "Couldn't get article identifier"
+	artIdentifier = "<"+str(datamodel['identifiers']['artIdentifierBase'])+get_text(artIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
 	
 	triples[artIdentifier] = {} # Create a dictionary object for the article
 	triples[artIdentifier]['rdf:type'] = 'fabio:Document' # It may be something more specific, but we don't know that yet
@@ -271,25 +281,25 @@ def read_xml (inputFile, authorities):
 	#Some special treatment of the license info, to extract a link to the license URL if there is one
 	if triples[artIdentifier].has_key('__licenseStatement'):
 		license = artWrapper.find(datamodel['artMetadata']['__licenseStatement'])
-		licenseURL = license.attrib.get(datamodel['__licenseURL'])
+		licenseURL = license.attrib.get(datamodel['identifiers']['__licenseURL'])
 		if licenseURL != None:
 			licenseURL = value_cleanup(licenseURL)
 			triples[artIdentifier]['__licenseURL'] = licenseURL
 	
 	#Make a graph for each cited work in the references section
-	refList = xmlRoot.findall(datamodel['refElement'])
+	refList = xmlRoot.findall(datamodel['wrappers']['refElement'])
 	refList = list(result for result in refList) #turn it into a list
 
 	refIDs = []
 	for ref in refList:
-		refIdentifier = ref.find(datamodel['refIdentifierElement'])
+		refIdentifier = ref.find(datamodel['identifiers']['refIdentifierElement'])
 		#If there was no identifier, we will have to make a hash
 		if refIdentifier == None:
 			refIdentifier = md5() #Create an md5 hash object
 			refIdentifier.update(get_text(ref))
 			refIdentifier = "<"+str(refIdentifier.hexdigest())+">"
 		else:
-			refIdentifier = "<"+str(datamodel['refIdentifierBase'])+get_text(refIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier
+			refIdentifier = "<"+str(datamodel['identifiers']['refIdentifierBase'])+get_text(refIdentifier)+">" #This has to be a single string, with carats to mark it as a unique identifier  # No URI "base" for these yet - perhaps could add one?
 
 		triples[refIdentifier] = {} # Create a dictionary entry for the ref
 		triples[refIdentifier]['rdf:type'] = 'fabio:Document'

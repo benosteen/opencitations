@@ -6,8 +6,6 @@ Read RDF data in XML or any triples format, does some cleanup, and outputs as Tu
 
 import sys, re, os
 from read_triples import read_triples
-from namespace_authorities import get_nsAuthorities
-from output_vocabulary import get_vocabulary
 from dir_navigator import Walk
 from check_fulltext import check_fulltext
 from restructure_data import restructure_data
@@ -178,13 +176,16 @@ for inputFileName in sorted(sourceFiles):
 
 	""")
 	outputFile.write ("## Source file: " + str(inputFileName) + "\n\n")
-
+	
+	from MyConfigParser import MyConfigParser  #Uses my own modified version of ConfigParser, to facilitate character escaping
 	#Get namespace authorities from separate manifest
-	authorities = get_nsAuthorities()
+	authorities = MyConfigParser()
+	authorities.read('namespace_authorities.cfg')
 
 	#List all the authority prefixes at the top of the output file
-	for auth in sorted(authorities.keys()):
-		outputFile.write("@prefix\t" + authorities[auth] + "\t<" + auth + ">.\n")
+	for section in authorities.sections():
+		for prefix in authorities.options(section):
+			outputFile.write("@prefix\t" + prefix + ":\t<" + authorities.get(section, prefix) + ">.\n")
 
 	outputFile.write("\n")
 
