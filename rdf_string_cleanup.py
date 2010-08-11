@@ -20,8 +20,9 @@ def predicate_cleanup (predicate, authorities):
 		predicateName = m.group(2)
 		
 		prefix = 0
-		if authorities.has_key(authority):
-			prefix = authorities[authority]
+		#if authorities.has_key(authority):
+		if authority in authorities.options('PLoS_authorities'):
+			prefix = authorities.get('PLoS_authorities', authority)
 		else:
 			print "Don't recognise the authority " + authority + "\n"
 		
@@ -34,8 +35,8 @@ def predicate_cleanup (predicate, authorities):
 		m = re.search('^(.+?):', predicate)
 		prefix = m.group(1)
 		
-		if not prefix in authorities.values():
-			print "Haven't defined the prefix " + prefix + "\n"
+		if not prefix in list(y for x, y in authorities.items('PLoS_authorities') + authorities.items('PLoS_unauthorised')):
+			print "Haven't defined the prefix " + prefix
 	
 	return predicate
 

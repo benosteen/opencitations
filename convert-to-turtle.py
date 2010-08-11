@@ -14,17 +14,20 @@ from restructure_data import restructure_data
 def sort_graphs(subject):
 	graphType = 0
 	
-	if triples[subject]['rdf:type']=='fabio:Document' and triples[subject].has_key('cito:cites'):  #It's the citing article graph
-		graphType = '00-'
-	elif triples[subject]['rdf:type']=='fabio:Document': #It's an article - either a cited article, or an article that abstract that simply has no citations
-		graphType = '01-'
-	elif triples[subject]['rdf:type']=='foaf:Person': #It's an author graph
-		graphType = '02-'
-	else:
-		print "Graph type unknown"
-		graphType = '99-'
+	if triples[subject].has_key('rdf:type'):
+		if triples[subject].has_key('cito:cites'):  #It's the citing article graph
+			graphType = '00-'
+		elif triples[subject]['rdf:type']=='fabio:Document': #It's an article - either a cited article, or an article that abstract that simply has no citations
+			graphType = '01-'
+		elif '<http://purl.org/net/nknouf/ns/bibtex#Article>' in triples[subject]['rdf:type']: # Also an article
+			graphType = '01-'
+		elif triples[subject]['rdf:type']=='foaf:Person': #It's an author graph
+			graphType = '02-'
+		else:
+			print "Graph type unknown"
+			graphType = '99-'
 		
-	sortKey = graphType + str(subject)
+	sortKey = str(graphType) + str(subject)
 	return sortKey
 
 # As above, but sort rules for predicates
@@ -184,8 +187,8 @@ for inputFileName in sorted(sourceFiles):
 
 	#List all the authority prefixes at the top of the output file
 	for section in authorities.sections():
-		for prefix in authorities.options(section):
-			outputFile.write("@prefix\t" + prefix + ":\t<" + authorities.get(section, prefix) + ">.\n")
+		for auth in authorities.options(section):
+			outputFile.write("@prefix\t" + authorities.get(section, auth) + ":\t<" + auth + ">.\n")
 
 	outputFile.write("\n")
 

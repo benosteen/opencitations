@@ -47,7 +47,17 @@ def read_nTriples (inputFile, authorities):
 			#triples[subject][predicate].append(values)
 		else:
 			triples[subject][predicate] = values
-			
+	
+	# Make sure all the graphs have an rdf:type
+	for subject in triples.keys():
+		if not triples[subject].has_key('rdf:type'):
+			if triples[subject].has_key('plos:hasAuthorList') or triples[subject].has_key('dc:creator') or triples[subject].has_key('cito:cites'): #So it's an article
+				triples[subject]['rdf:type'] = 'fabio:Document'
+			elif triples[subject].has_key('foaf:familyName'): #So it's an author
+				triples[subject]['rdf:type'] = 'fabio:Person'
+			else:
+				print "Graph for %s lacks rdf:type" % subject
+	
 	return triples
 
 
