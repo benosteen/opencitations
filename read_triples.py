@@ -25,7 +25,6 @@ def read_nTriples (inputFile, authorities):
 		
 			subject = fields[0]
 			predicate = fields[1]
-			#value = fields[2]
 			values = fields[2].split(", ")
 			
 		else:
@@ -35,7 +34,7 @@ def read_nTriples (inputFile, authorities):
 		
 		#Send these variables off for cleanup
 		predicate = predicate_cleanup(predicate, authorities)
-		values = value_cleanup(values)
+		values = value_cleanup(values, authorities)
 		
 		#Python but not Perl: If there is not yet a second-level dictionary object for this subject, need to create it. (Otherwise the attempt below to look up a predicate key under this subject will cause an error.)
 		if not triples.has_key(subject):
@@ -51,7 +50,7 @@ def read_nTriples (inputFile, authorities):
 	# Make sure all the graphs have an rdf:type
 	for subject in triples.keys():
 		if not triples[subject].has_key('rdf:type'):
-			if triples[subject].has_key('plos:hasAuthorList') or triples[subject].has_key('dc:creator') or triples[subject].has_key('cito:cites'): #So it's an article
+			if triples[subject].has_key('plos:hasAuthorList') or triples[subject].has_key('dc:creator') or triples[subject].has_key('cito:cites') or triples[subject].has_key('dcterms:references'): #So it's an article
 				triples[subject]['rdf:type'] = 'fabio:Document'
 			elif triples[subject].has_key('foaf:familyName'): #So it's an author
 				triples[subject]['rdf:type'] = 'fabio:Person'
@@ -220,6 +219,7 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 # Method for reading in from xml format
 def read_xml (inputFile, authorities):
 	triples = {}
+	hasFulltext = 0
 	
 	# Read the input as a single string
 	inputString = inputFile.read()
@@ -256,6 +256,10 @@ def read_xml (inputFile, authorities):
 	#Register the datamodel's xml namespaces with ElementTree
 	for k, v in datamodel['xmlNamespaces'].items():
 		ElementTree.register_namespace(k, v)
+	
+	#Check whether there is fulltext present (used for reporting only)
+	if xmlRoot.find(datamodel['wrappers']['fulltextElement']):
+		hasFulltext = 1
 	
 	#Get the block of article metadata info, using the datamodel to navigate the xml
 	artWrapper = xmlRoot.find(datamodel['wrappers']['artWrapperElement'])
@@ -336,16 +340,18 @@ def read_xml (inputFile, authorities):
 	if refIDs != []:
 		triples[artIdentifier]['cito:cites'] = refIDs
 	
-	return triples
+	return triples, hasFulltext
 
 #Method for receiving input, sending to correct reader according to format
 def read_triples(inputFile, inputFormat, authorities):
 	triples = {}
+	hasFulltext = 0
 	
 	if re.search('triple', inputFormat, re.IGNORECASE):
 		triples = read_nTriples(inputFile, authorities)
+		hasFulltext = 0
 	
 	elif re.search('xml', inputFormat, re.IGNORECASE):
-		triples = read_xml(inputFile, authorities)
+		(triples, hasFulltext) = read_xml(inputFile, authorities)
 		
-	return triples
+	return triples, hasFulltext

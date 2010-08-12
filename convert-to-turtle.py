@@ -7,23 +7,33 @@ Read RDF data in XML or any triples format, does some cleanup, and outputs as Tu
 import sys, re, os
 from read_triples import read_triples
 from dir_navigator import Walk
-from check_fulltext import check_fulltext
 from restructure_data import restructure_data
 
 # Creates custom sort-keys, so that graphs can be output in an order more readable for humans
 def sort_graphs(subject):
 	graphType = 0
 	
+	# This here assumes that the value of 'rdf:type' will always be a string. But if could be a list
+	
 	if triples[subject].has_key('rdf:type'):
+		rdfType = triples[subject]['rdf:type']
+		
 		if triples[subject].has_key('cito:cites'):  #It's the citing article graph
 			graphType = '00-'
-		elif triples[subject]['rdf:type']=='fabio:Document': #It's an article - either a cited article, or an article that abstract that simply has no citations
+		elif rdfType=='fabio:Document' or 'fabio:Document' in rdfType: #It's an article - either a cited article, or an article that abstract that simply has no citations
 			graphType = '01-'
-		elif '<http://purl.org/net/nknouf/ns/bibtex#Article>' in triples[subject]['rdf:type']: # Also an article
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Article>' or '<http://purl.org/net/nknouf/ns/bibtex#Article>' in rdfType: # Also an article
 			graphType = '01-'
-		elif triples[subject]['rdf:type']=='foaf:Person': #It's an author graph
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Book>' or '<http://purl.org/net/nknouf/ns/bibtex#Book>' in rdfType: # Also an article
+			graphType = '01-'
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Entry>' or '<http://purl.org/net/nknouf/ns/bibtex#Entry>' in rdfType: # Also an article
+			graphType = '01-'
+		elif rdfType=='foaf:Person' or 'foaf:Person' in rdfType: #It's an author graph
 			graphType = '02-'
+		elif rdfType=='rdf:Seq' or 'rdf:Seq' in rdfType: #It's an author graph
+			graphType = '99-'
 		else:
+			print rdfType
 			print "Graph type unknown"
 			graphType = '99-'
 		
@@ -52,25 +62,25 @@ def print_indent (depth):
 		indent += 1
 
 # A recursive function, that prints out dictionary contents, and recurses through sub-dictionaries
-def print_dictionary (dict, depth):
-	for key in sorted(dict.keys(), key=sort_predicates):
+def print_dictionary (dictionary, depth):
+	for key in sorted(dictionary.keys(), key=sort_predicates):
 		print_indent(depth)
 		outputFile.write(key + '\t')
-		if type(dict[key]).__name__=='str':
-			toprint = dict[key]
+		if isinstance(dictionary[key], basestring):
+			toprint = dictionary[key]
 			outputFile.write(toprint + ';\n')
-		elif type(dict[key]).__name__=='list':
-			toprint = ", ".join(dict[key])
+		elif isinstance(dictionary[key], list):
+			toprint = ", ".join(dictionary[key])
 			outputFile.write(toprint + ';\n')
-		elif type(dict[key]).__name__=='dict':
+		elif isinstance(dictionary[key], dict):
 			depth += 1
 			outputFile.write('[\n')
-			print_dictionary(dict[key], depth)
+			print_dictionary(dictionary[key], depth)
 			print_indent(depth-1)
 			outputFile.write(']\n')
 			depth -= 1
 		else:
-			"Unexpected data type for output value: " + str(type(dict[key]).__name__)
+			"Unexpected data type: " + str(type(dictionary[key]).__name__)
 			
 def output_turtle (triples):
 	hasMetadata = hasRefs = 0
@@ -89,17 +99,17 @@ def output_turtle (triples):
 			
 			outputFile.write("\t" + predicate + "\t") 
 			# # # Here we are going to make sure the output value is a string
-			if type(values).__name__=='dict':
+			if isinstance(values, dict):
 				outputFile.write('[\n')
 				print_dictionary(values, depth=2) #Send it to a recursive dictionary printer (can go as deep as required)
 				print_indent(depth=1)
 				outputFile.write(']')
-			elif type(values).__name__=='str':
+			elif isinstance(values, basestring):
 				outputFile.write(values)
-			elif type(values).__name__=='list':
+			elif isinstance(values, list):
 				outputFile.write(", ".join(values))
 			else:
-				print "Unexpected data type for output value: " + str(type(values).__name__)
+				print "Unexpected data type: " + str(type(values).__name__)
 			
 			
 			#Last one should be followed by full stop
@@ -193,17 +203,11 @@ for inputFileName in sorted(sourceFiles):
 	outputFile.write("\n")
 
 	#Read the inputFile in to a triples dictionary. In fact it will be a multidimensional dictionary, taking the form triples[subject][predicate]
-	triples = read_triples(inputFile, inputFormat, authorities)
+	(triples, hasFulltext) = read_triples(inputFile, inputFormat, authorities)
 	
 	#Restructure data graphs, one by one
 	for graph in triples.keys():
 		triples[graph] = restructure_data(triples[graph])
-
-	#Check whether input article (if it is an xml document) contains fulltext
-	inputFile = open(inputFileName, 'r')
-	hasFulltext = 0
-	if re.search('xml', inputFormat, re.IGNORECASE):
-		hasFulltext = check_fulltext(inputFile)
 	
 	# Output the rdf triples data
 	# (And record these flags as you do so)

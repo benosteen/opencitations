@@ -20,7 +20,6 @@ def predicate_cleanup (predicate, authorities):
 		predicateName = m.group(2)
 		
 		prefix = 0
-		#if authorities.has_key(authority):
 		if authority in authorities.options('PLoS_authorities'):
 			prefix = authorities.get('PLoS_authorities', authority)
 		else:
@@ -35,15 +34,15 @@ def predicate_cleanup (predicate, authorities):
 		m = re.search('^(.+?):', predicate)
 		prefix = m.group(1)
 		
-		if not prefix in list(y for x, y in authorities.items('PLoS_authorities') + authorities.items('PLoS_unauthorised')):
+		if not prefix in list(y for x, y in authorities.items('PLoS_authorities') + authorities.items('PLoS_unauthorised')): # i.e. check whether the prefix can be found as a value anywhere in the authorities config
 			print "Haven't defined the prefix " + prefix
 	
 	return predicate
 
 # Cleanup a value; should work for both a string or a list
-def value_cleanup (values):
+def value_cleanup (values, authorities=0):
 	family_values = []
-	if type(values).__name__=='list':
+	if isinstance(values, list):
 		for value in values:
 			# Some syntax cleanup
 			if re.search("^'.+'$", value):
@@ -53,9 +52,16 @@ def value_cleanup (values):
 				
 			if re.search('(\n|\t|  )', value): #Normalise whitespace
 				value = re.sub("(\n|\t|  )", " ", value)
+				
+			#Check if it is a controlled vocab term erroneously surrounded by carats
+			if re.search('^<([^:]+):[^:]+>$', value):
+				m = re.search('^<([^:]+):[^:]+>$', value)
+				match = m.group(1)
+				if match in list(y for x, y in authorities.items('PLoS_authorities') + authorities.items('PLoS_unauthorised')): # i.e. is it a value anywhere in the authorities config
+					value = re.sub("^<(.+)>$", r"\1", value)
 			
 			family_values.append(value)
-	elif type(values).__name__=='str':
+	elif isinstance(values, basestring):
 		# Some syntax cleanup
 		if re.search("^'.+'$", values):
 			values = re.sub("^'(.+)'$", r'"\1"', values) #Change single quotes to doubles
@@ -63,6 +69,13 @@ def value_cleanup (values):
 			values = re.sub("^(.+)$", r'"\1"', values)
 		if re.search('(\n|\t|  )', values): #Normalise whitespace
 				values = re.sub("(\n|\t|  )", " ", values)
+		
+		#Check if it is a controlled vocab term erroneously surrounded by carats
+		if re.search('^<([^:]+):[^:]+>$', values):
+			m = re.search('^<([^:]+):[^:]+>$', values)
+			match = m.group(1)
+			if match in list(y for x, y in authorities.items('PLoS_authorities') + authorities.items('PLoS_unauthorised')): # i.e. is it a value anywhere in the authorities config
+				values = re.sub("^<(.+)>$", r"\1", values)
 		
 		family_values = values
 	
