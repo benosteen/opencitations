@@ -71,8 +71,7 @@ def get_text (xmlElement):
 # For extracting author affiliations; decided to make this a separate function (compared to other content extraction) because it's rather complicated
 def get_affiliations (artWrapper, datamodel):
 	affiliationData = {}
-	affiliations = artWrapper.findall(datamodel['wrappers']['affiliationWrapper'])
-	affiliations = list(result for result in affiliations) #turn it into a list
+	affiliations = list(artWrapper.findall(datamodel['wrappers']['affiliationWrapper']))
 	
 	#If there are multiple affiliations, then analyse them separately so that authors can be linked to them separately
 	if len(affiliations) > 1:
@@ -86,7 +85,7 @@ def get_affiliations (artWrapper, datamodel):
 			affiliationData[affiliationId] = {}
 			for elementName in datamodel['affiliation'].keys():
 				data = aff.findall(datamodel['affiliation'][elementName])
-				data = list(get_text(result) for result in data) # listify
+				data = list(get_text(result) for result in data) # get text for all
 				if data:
 					data = value_cleanup(data)
 					affiliationData[affiliationId][elementName] = data
@@ -135,8 +134,7 @@ def get_affiliations (artWrapper, datamodel):
 	
 	
 	# Also check for email addresses that are linked to certain authors. Will only record email addresses, and not any other correspondence text.
-	correspondences = artWrapper.findall(datamodel['correspondence']['correspondence'])
-	correspondences = list(result for result in correspondences) #turn it into a list
+	correspondences = list(artWrapper.findall(datamodel['correspondence']['correspondence']))
 	
 	for corres in correspondences:
 		if corres.attrib.get(datamodel['correspondence']['correspondenceIdentifier']):
@@ -173,6 +171,10 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 			if data:
 				authorData[metaField] = data
 		
+		# If none of the structured fields were found, then just throw all the text into "name"
+		if not authorData:
+			authorData['foaf:Name'] = value_cleanup(get_text(eachAuthor))
+		
 		if affiliationData:
 			#If the author has a ref to one of multiple affiliations listed, record that as their affiliation
 			if authorData.has_key('affiliationRef'):
@@ -206,10 +208,13 @@ def add_author_data (triples, data, datamodel, affiliationData, artIdentifier):
 			authorId = "<"+str(authorId.hexdigest())+">"
 			authorURIs.append(authorId)
 			triples[authorId] = {}
-			triples[authorId]['rdf:type'] = 'foaf:Person'
 			for metaField in authorData.keys():
 				content = authorData[metaField]
 				triples[authorId][metaField] = content
+			if authorData.has_key('foaf:familyName'):
+				triples[authorId]['rdf:type'] = 'foaf:Person'
+			else:
+				triples[authorId]['rdf:type'] = 'foaf:Agent'
 	
 	authorURIs = value_cleanup(authorURIs)
 	triples[artIdentifier]['dc:creator'] = authorURIs
@@ -278,8 +283,7 @@ def read_xml (inputFile, authorities):
 	
 	#And now get each of the article metadata fields from the artWrapper; when you get to authors, given them their own graphs
 	for elementName in datamodel['artMetadata'].keys():
-		data = artWrapper.findall(datamodel['artMetadata'][elementName])
-		data = list(result for result in data) #turn it into a list
+		data = list(artWrapper.findall(datamodel['artMetadata'][elementName]))
 		
 		#Special treatment for author metadata
 		if elementName=='dc:creator':
@@ -288,21 +292,20 @@ def read_xml (inputFile, authorities):
 		#It's other standard metadata
 		else:
 			data = list(get_text(result) for result in data) # make it a list of strings
-			if data != []:
-				data = value_cleanup(data)
+			if data:
+				data = value_cleanup(data, authorities)
 				triples[artIdentifier][elementName] = data
 	
 	#Some special treatment of the license info, to extract a link to the license URL if there is one
 	if triples[artIdentifier].has_key('__licenseStatement'):
 		license = artWrapper.find(datamodel['artMetadata']['__licenseStatement'])
 		licenseURL = license.attrib.get(datamodel['identifiers']['__licenseURL'])
-		if licenseURL != None:
+		if licenseURL:
 			licenseURL = value_cleanup(licenseURL)
 			triples[artIdentifier]['__licenseURL'] = licenseURL
 	
 	#Make a graph for each cited work in the references section
-	refList = xmlRoot.findall(datamodel['wrappers']['refElement'])
-	refList = list(result for result in refList) #turn it into a list
+	refList = list(xmlRoot.findall(datamodel['wrappers']['refElement']))
 
 	refIDs = []
 	for ref in refList:
@@ -320,17 +323,35 @@ def read_xml (inputFile, authorities):
 		
 		#And now get each of the reference metadata fields from the ref
 		for elementName in datamodel['refMetadata'].keys():
-			data = ref.findall(datamodel['refMetadata'][elementName])
-			data = list(result for result in data) #turn it into a list 
-			#print data
+			data = list(ref.findall(datamodel['refMetadata'][elementName]))
 			
 			if elementName=='dc:creator':
 				triples = add_author_data(triples, data, datamodel, None, refIdentifier)
 			
+			# Sometimes a references has an attribute explicitly saying what kind of document is being referenced...
+			elif elementName=='typeElement':
+				#Need to get the actual type value from an attribute, then store this in the triple, rather than the element itself
+				if data:
+					type = data[0].attrib.get(datamodel['misc']['rdf:type'])
+					
+					types = {
+						'journal': 'fabio:JournalArticle',
+						'book': 'fabio:Book',
+						'webpage': 'fabio:WebContent',
+						'web': 'fabio:WebContent',
+						'confproc': 'fabio:ConferenceProceedings',
+						'other': 'fabio:Document'
+					}
+					if types.has_key(type):
+						type = types[type]
+					
+					if type:
+						triples[refIdentifier]['rdf:type'] = value_cleanup(type, authorities)
+					continue
 			else:
 				data = list(get_text(result) for result in data) # make it a list of strings
-				if data != []:
-					data = value_cleanup(data)
+				if data:
+					data = value_cleanup(data, authorities)
 					triples[refIdentifier][elementName] = data
 		
 		refIDs.append(refIdentifier)

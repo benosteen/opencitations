@@ -17,24 +17,25 @@ def sort_graphs(subject):
 	
 	if triples[subject].has_key('rdf:type'):
 		rdfType = triples[subject]['rdf:type']
+		if isinstance(rdfType, list):
+			rdfType = rdfType[0] #If there are multiple type values, just take the first
 		
 		if triples[subject].has_key('cito:cites'):  #It's the citing article graph
 			graphType = '00-'
-		elif rdfType=='fabio:Document' or 'fabio:Document' in rdfType: #It's an article - either a cited article, or an article that abstract that simply has no citations
+		elif re.search('^fabio:', rdfType): #It's a work of some sort
 			graphType = '01-'
-		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Article>' or '<http://purl.org/net/nknouf/ns/bibtex#Article>' in rdfType: # Also an article
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Article>': # Also an article
 			graphType = '01-'
-		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Book>' or '<http://purl.org/net/nknouf/ns/bibtex#Book>' in rdfType: # Also an article
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Book>': # Also an article
 			graphType = '01-'
-		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Entry>' or '<http://purl.org/net/nknouf/ns/bibtex#Entry>' in rdfType: # Also an article
+		elif rdfType=='<http://purl.org/net/nknouf/ns/bibtex#Entry>': # Also an article
 			graphType = '01-'
-		elif rdfType=='foaf:Person' or 'foaf:Person' in rdfType: #It's an author graph
+		elif rdfType=='foaf:Person' or rdfType=='foaf:Agent': #It's an author graph
 			graphType = '02-'
-		elif rdfType=='rdf:Seq' or 'rdf:Seq' in rdfType: #It's an author graph
+		elif rdfType=='rdf:Seq': #It's an author graph
 			graphType = '99-'
 		else:
-			print rdfType
-			print "Graph type unknown"
+			print "Graph type unknown %s" % rdfType
 			graphType = '99-'
 		
 	sortKey = str(graphType) + str(subject)
@@ -107,7 +108,19 @@ def output_turtle (triples):
 			elif isinstance(values, basestring):
 				outputFile.write(values)
 			elif isinstance(values, list):
-				outputFile.write(", ".join(values))
+				listPos = 0
+				for item in values:
+					if isinstance(item, dict):
+						outputFile.write('[\n')
+						print_dictionary(item, depth=2) #Send it to a recursive dictionary printer (can go as deep as required)
+						print_indent(depth=1)
+						outputFile.write(']')
+					else:
+						outputFile.write(item)
+					if not listPos + 1 == len(values):
+						outputFile.write(', ')
+					listPos += 1
+				#outputFile.write(", ".join(values))
 			else:
 				print "Unexpected data type: " + str(type(values).__name__)
 			
